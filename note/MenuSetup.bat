@@ -1,0 +1,127 @@
+@echo off
+title 文件夹右键菜单管理工具
+
+:: 获取管理员权限
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+if %errorlevel% neq 0 (
+    echo 正在请求管理员权限...
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    "%temp%\getadmin.vbs"
+    del "%temp%\getadmin.vbs"
+    exit /B
+)
+
+:: 获取当前目录
+set "CURRENT_DIR=%~dp0"
+set "EXE_NAME=文件夹备注工具.exe"
+set "MENU_NAME=打开文件夹备注工具 by13x286"
+set "MENU_KEY=FolderNoteOpen"
+
+:menu
+cls
+echo ===================================
+echo    文件夹右键菜单管理工具
+echo ===================================
+echo.
+echo  1. 注册右键菜单
+echo  2. 删除右键菜单
+echo  3. 测试程序传参
+echo  0. 退出
+echo.
+set /p choice="请选择操作(1/2/3/0): "
+
+if "%choice%"=="1" goto register
+if "%choice%"=="2" goto remove
+if "%choice%"=="3" goto test
+if "%choice%"=="0" exit
+echo 无效选择，请重新输入
+timeout /t 2 >nul
+goto menu
+
+:register
+echo.
+echo 检查程序文件是否存在...
+if not exist "%CURRENT_DIR%%EXE_NAME%" (
+    echo 错误: 找不到 %CURRENT_DIR%%EXE_NAME% 文件！
+    echo 请确保 %EXE_NAME% 与此脚本在同一目录。
+    pause
+    goto menu
+)
+
+echo 正在注册右键菜单...
+
+:: 为文件夹背景添加右键菜单 (在文件夹空白处右键)
+reg add "HKCR\Directory\Background\shell\%MENU_KEY%" /ve /d "%MENU_NAME%" /f
+reg add "HKCR\Directory\Background\shell\%MENU_KEY%\command" /ve /d "\"%CURRENT_DIR%%EXE_NAME%\" \"%%V\"" /f
+
+:: 为文件夹添加右键菜单 (对文件夹图标右键)
+reg add "HKCR\Directory\shell\%MENU_KEY%" /ve /d "%MENU_NAME%" /f
+reg add "HKCR\Directory\shell\%MENU_KEY%\command" /ve /d "\"%CURRENT_DIR%%EXE_NAME%\" \"%%1\"" /f
+
+echo.
+echo 右键菜单已成功添加！
+echo.
+echo 注意：
+echo - 文件夹内空白处右键: 传递当前文件夹路径
+echo - 文件夹图标右键: 传递所选文件夹路径
+echo.
+pause
+goto menu
+
+:remove
+echo.
+echo 正在检查菜单是否存在...
+
+:: 检查菜单是否存在
+reg query "HKCR\Directory\Background\shell\%MENU_KEY%" >nul 2>&1
+set bg_exists=%errorlevel%
+reg query "HKCR\Directory\shell\%MENU_KEY%" >nul 2>&1
+set dir_exists=%errorlevel%
+
+if %bg_exists% neq 0 if %dir_exists% neq 0 (
+    echo.
+    echo 提示: 未找到已注册的右键菜单，无需删除。
+    echo.
+    pause
+    goto menu
+)
+
+echo 正在删除右键菜单...
+if %bg_exists% equ 0 (
+    reg delete "HKCR\Directory\Background\shell\%MENU_KEY%" /f >nul 2>&1
+    echo - 已删除文件夹背景菜单
+)
+if %dir_exists% equ 0 (
+    reg delete "HKCR\Directory\shell\%MENU_KEY%" /f >nul 2>&1
+    echo - 已删除文件夹菜单
+)
+echo.
+echo 右键菜单删除操作完成！
+echo.
+pause
+goto menu
+
+:test
+echo.
+echo 正在测试程序传参功能...
+echo.
+set "TEST_PATH=%CD%"
+echo 当前目录: %TEST_PATH%
+echo.
+echo 即将使用此路径测试程序，按任意键继续...
+pause >nul
+
+if not exist "%CURRENT_DIR%%EXE_NAME%" (
+    echo 错误: 找不到 %CURRENT_DIR%%EXE_NAME% 文件！
+    pause
+    goto menu
+)
+
+echo 启动程序中...
+start "" "%CURRENT_DIR%%EXE_NAME%" "%TEST_PATH%"
+echo.
+echo 如果程序已启动并自动填入当前路径，则测试成功！
+echo.
+pause
+goto menu
